@@ -1,0 +1,273 @@
+import java.util.function.BiConsumer
+
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+    id 'dagger.hilt.android.plugin'
+    id 'kotlin-kapt'
+    id 'kotlin-parcelize'
+    id 'org.jlleitschuh.gradle.ktlint'
+    id 'jacoco'
+}
+
+android {
+    namespace 'com.russell.temper.template'
+    compileSdkVersion android_compile_sdk_version
+
+    defaultConfig {
+        applicationId "com.russell.temper.template"
+        minSdkVersion android_min_sdk_version
+        targetSdkVersion android_target_sdk_version
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        kapt {
+            arguments {
+                arg("room.schemaLocation", "$projectDir/schemas".toString())
+            }
+        }
+        vectorDrawables {
+            useSupportLibrary true
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+            shrinkResources false
+        }
+
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+        prod.initWith(buildTypes.release)
+        prod {
+            for (Map.Entry<String, String> entry : loadPropertiesIntoMap("prod").entrySet()) {
+                buildConfigField "String", entry.key, "\"${entry.value}\""
+            }
+        }
+
+        dev.initWith(buildTypes.debug)
+        dev {
+            applicationIdSuffix ".dev"
+            testCoverageEnabled true
+            for (Map.Entry<String, String> entry : loadPropertiesIntoMap("dev").entrySet()) {
+                buildConfigField "String", entry.key, "\"${entry.value}\""
+            }
+        }
+    }
+
+    buildFeatures {
+        viewBinding true
+        compose true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion compose_version
+    }
+
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+
+    ktlint {
+        version = "0.45.1"
+        additionalEditorconfigFile = file("./.editorconfig")
+
+        reporters {
+            reporter "html"
+        }
+
+        filter {
+            exclude("**/androidTest/**")
+            include("**/test/**")
+        }
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
+    applicationVariants.all { variant ->
+        sourceSets {
+            main {
+                java {
+                    srcDir(file("build/generated/ksp/$variant.name/kotlin"))
+                }
+            }
+
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.xerial:sqlite-jdbc:3.36.0.3'
+
+    // AndroidX
+    implementation "androidx.core:core-ktx:$ktx_core_version"
+    implementation "androidx.appcompat:appcompat:$appcompat_version"
+    implementation "com.google.android.material:material:$material_version"
+    implementation "androidx.constraintlayout:constraintlayout:$constraint_layout_version"
+    implementation "androidx.security:security-crypto:$security_crypto"
+    implementation "androidx.lifecycle:lifecycle-process:$lifecycle_version"
+    implementation "com.google.android.play:core-ktx:$play_core_ktx_version"
+    implementation "androidx.fragment:fragment-ktx:$fragment_ktx"
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.0'
+
+    // Jetpack Compose
+    implementation "androidx.compose.ui:ui:$compose_version"
+    implementation "androidx.compose.material:material:$compose_version"
+    implementation "androidx.compose.ui:ui-tooling:$compose_version"
+    implementation "androidx.activity:activity-compose:$activity_compose_version"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:$viewmodel_compose_version"
+    implementation "androidx.compose.runtime:runtime-livedata:$compose_version"
+    implementation "com.google.accompanist:accompanist-systemuicontroller:$accompanist_version"
+    implementation "com.google.accompanist:accompanist-insets:$accompanist_version"
+
+    // DI- Hilt
+    kapt "com.google.dagger:hilt-android-compiler:$hilt_version"
+    kapt "androidx.hilt:hilt-compiler:$hilt_kapt_version"
+    implementation "com.google.dagger:hilt-android:$hilt_version"
+    implementation "androidx.hilt:hilt-navigation-compose:$hilt_navigation_compose_version"
+
+    // Networking
+    implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
+    implementation "com.squareup.okhttp3:logging-interceptor:$okhttp_logging_interceptor_version"
+    implementation "com.squareup.retrofit2:converter-scalars:$scalar_converters_version"
+
+    // Jackson
+    implementation "com.fasterxml.jackson.module:jackson-module-kotlin:$jacksonVersion"
+    implementation "com.squareup.retrofit2:converter-jackson:$retrofit_version"
+
+    // Coil Image Loading
+    implementation "io.coil-kt:coil-compose:$coil_version"
+
+    // Tests
+    testImplementation "junit:junit:$junit_version"
+    testImplementation "io.mockk:mockk:$mockk_version"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlin_coroutines_te_version"
+    testImplementation "org.amshove.kluent:kluent:$kluent_version"
+    testImplementation "org.amshove.kluent:kluent-android:$kluent_version"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+
+    androidTestImplementation "androidx.test.ext:junit:$androidx_junit_ext_version"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$espresso_core_version"
+}
+
+kapt {
+    correctErrorTypes true
+}
+
+android.variantFilter { variant ->
+    if (variant.buildType.name == 'release' || variant.buildType.name == 'debug') {
+        variant.setIgnore(true)
+    }
+}
+
+Properties loadProperties(String variant) {
+    def props = new Properties()
+    def filename = variant + ".properties"
+    try {
+        file(filename).withInputStream { props.load(it) }
+        return props
+    } catch (FileNotFoundException ignored) {
+        throw new Exception("Config not found ($filename).")
+    }
+}
+
+HashMap<String, String> loadPropertiesIntoMap(String variant) {
+    def map = new HashMap<String, String>()
+    loadProperties(variant).forEach(new BiConsumer<Object, Object>() {
+        @Override
+        void accept(Object key, Object value) {
+            map.put(key, value)
+        }
+    })
+    return map
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        freeCompilerArgs += "-opt-in=kotlin.RequiresOptIn"
+    }
+}
+
+tasks.withType(Test) {
+    jacoco.includeNoLocationClasses = true
+    jacoco.excludes = ['jdk.internal.*']
+}
+
+task jacocoTestReport(type: JacocoReport, dependsOn: ['testDevUnitTest', 'createDevCoverageReport']) {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+
+    def excludes = [
+            '**/R.class',
+            '**/R$*.class',
+            '**/BuildConfig.*',
+            '**/Manifest*.*',
+            '**/*Test*.*',
+            'android/**/*.*',
+            // dagger
+            '**/*_MembersInjector.class',
+            '**/Dagger*Component.class',
+            '**/Dagger*Component$Builder.class',
+            '**/*Module_*Factory.class',
+            '**/di/module/*',
+            '**/*_Factory*.*',
+            '**/*Module*.*',
+            '**/*Dagger*.*',
+            '**/*Hilt*.*',
+            // kotlin
+            '**/*MapperImpl*.*',
+            '**/*$ViewInjector*.*',
+            '**/*$ViewBinder*.*',
+            '**/BuildConfig.*',
+            '**/*Component*.*',
+            '**/*BR*.*',
+            '**/Manifest*.*',
+            '**/*$Lambda$*.*',
+            '**/*Companion*.*',
+            '**/*Module*.*',
+            '**/*Dagger*.*',
+            '**/*Hilt*.*',
+            '**/*MembersInjector*.*',
+            '**/*_MembersInjector.class',
+            '**/*_Factory*.*',
+            '**/*_Provide*Factory*.*'
+    ]
+    def debugTree = fileTree(dir: "${buildDir}/intermediates/javac/dev/classes", excludes: excludes)
+    def mainSrc = "${project.projectDir}/src/main/java"
+    def kotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/dev",
+            excludes: excludes)
+
+    sourceDirectories.setFrom(files([mainSrc]))
+    classDirectories.setFrom(files([debugTree, kotlinClasses]))
+    executionData.setFrom(fileTree(dir: project.projectDir, includes:
+            ['**/**/*.exec', '**/**/*.ec']))
+}

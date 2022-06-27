@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Template App</string>
+    <string name="login_button_text">Inloggen</string>
+    <string name="register_button_text">Schrijf je in</string>
+    <string name="filter_button_text">Filters</string>
+    <string name="auth_screen_title">Auth Screen</string>
+</resources>
